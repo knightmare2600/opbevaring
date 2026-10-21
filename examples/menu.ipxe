@@ -5,18 +5,22 @@
 # a second initrd. The hook fetches update_url= into /cdrom before the stock
 # installer TUI (tty1/ttyS0) or its JSON-RPC server (port 8080) start.
 #
-# UNTESTED on real hardware as of 2026-10-21 -- see README.md "Status".
-# Paths follow ${boot-url}/<product>/<project>/<version>/, cf. :klargoring's
-# ${boot-url}/proxmox/klargoring/<arch>/.
+# Confirmed end-to-end on real hardware, BIOS and UEFI (Robert, 2026-10-21,
+# TrueNAS 25.10.2.1, opbevaring 1.0.1): PXE boot -> payload fetch -> stock
+# installer -> truenas_admin password prompt -> install -> reboot.
+#
+# Web layout is bootstrap/web/opbevaring/<version>/, i.e.
+# ${boot-url}/opbevaring/<version>/ -- fully literal per-version paths, same
+# reasoning as :klargoring's literal per-arch paths.
 # ===========================================================================
 :opbevaring
-kernel ${boot-url}/truenas/opbevaring/25.10.2.1/vmlinuz boot=live fetch=${boot-url}/truenas/opbevaring/25.10.2.1/filesystem.squashfs update_url=${boot-url}/truenas/opbevaring/25.10.2.1/TrueNAS-SCALE.update nomodeset console=tty0
-initrd ${boot-url}/truenas/opbevaring/25.10.2.1/initrd.img
-initrd ${boot-url}/truenas/opbevaring/25.10.2.1/opbevaring-hook.cpio
+kernel ${boot-url}/opbevaring/25.10.2.1/vmlinuz boot=live fetch=${boot-url}/opbevaring/25.10.2.1/filesystem.squashfs update_url=${boot-url}/opbevaring/25.10.2.1/TrueNAS-SCALE.update nomodeset console=tty0
+initrd ${boot-url}/opbevaring/25.10.2.1/initrd.img
+initrd ${boot-url}/opbevaring/25.10.2.1/opbevaring-hook.cpio
 boot
 
 :opbevaring-s
-kernel ${boot-url}/truenas/opbevaring/25.10.2.1/vmlinuz boot=live fetch=${boot-url}/truenas/opbevaring/25.10.2.1/filesystem.squashfs update_url=${boot-url}/truenas/opbevaring/25.10.2.1/TrueNAS-SCALE.update nomodeset console=tty0 console=ttyS0,115200n8
-initrd ${boot-url}/truenas/opbevaring/25.10.2.1/initrd.img
-initrd ${boot-url}/truenas/opbevaring/25.10.2.1/opbevaring-hook.cpio
+kernel ${boot-url}/opbevaring/25.10.2.1/vmlinuz boot=live fetch=${boot-url}/opbevaring/25.10.2.1/filesystem.squashfs update_url=${boot-url}/opbevaring/25.10.2.1/TrueNAS-SCALE.update nomodeset console=tty0 console=ttyS0,115200n8
+initrd ${boot-url}/opbevaring/25.10.2.1/initrd.img
+initrd ${boot-url}/opbevaring/25.10.2.1/opbevaring-hook.cpio
 boot
