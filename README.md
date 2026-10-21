@@ -381,9 +381,11 @@ and any TrueNAS release other than 25.10.2.1.
 
 ## Release history
 
-- **Unreleased** — payload sha256 verification on by default, looked up
-  in the version folder's `SHA256SUMS`; `update_sha256=off` to disable.
-  `--retry-connrefused` on both `curl` calls.
+- **1.1.0** (2026-10-21) — payload sha256 verification on by default,
+  looked up in the version folder's `SHA256SUMS`, which must now be served
+  alongside the `.update`; `update_sha256=off` to disable.
+  `--retry-connrefused` on both `curl` calls. Default-on verification
+  tested offline; the hardware confirmation above is from 1.0.1.
 - **1.0.1** (2026-10-21) — first release. Web layout
   `bootstrap/web/opbevaring/<version>/`. Confirmed end-to-end on BIOS and
   UEFI with TrueNAS 25.10.2.1. `opbevaring-hook.cpio` is byte-identical to
