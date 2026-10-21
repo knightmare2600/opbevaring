@@ -8,6 +8,7 @@
 # Confirmed end-to-end on real hardware, BIOS and UEFI (Robert, 2026-10-21,
 # TrueNAS 25.10.2.1, opbevaring 1.0.1): PXE boot -> payload fetch -> stock
 # installer -> truenas_admin password prompt -> install -> reboot.
+# :opbevaring-s confirmed on the serial console the same day (Dell NAS).
 #
 # Web layout is bootstrap/web/opbevaring/<version>/, i.e.
 # ${boot-url}/opbevaring/<version>/ -- fully literal per-version paths, same

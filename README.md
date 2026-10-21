@@ -5,10 +5,14 @@ loop and no rebuilt TrueNAS image: the stock kernel, initrd and live root
 straight off the ISO, plus one 7.5 KiB extra initrd that fetches the install
 payload from a URL given on the kernel cmdline.
 
-*Opbevaring* (Danish, "storage"). A sibling of
-[Klargøring](https://github.com/knightmare2600/klargoring), for the same
-estate and for the same reason — a vendor installer that only knows how to
-start from physical media — but solved differently, see below.
+*Opbevaring* (Danish, "storage" — see [Why "Opbevaring"?](#why-opbevaring))
+is this repo/project: the hook, its build tooling and the iPXE examples.
+A sibling of [Klargøring](https://github.com/knightmare2600/klargoring),
+for the same estate and for the same reason — a vendor installer that only
+knows how to start from physical media — but solved differently, see below.
+Internal names in this repo (`opbevaring-fetch.service`,
+`/scripts/live-bottom/opbevaring`, `opbevaring-hook.cpio`, the
+`bootstrap/web/opbevaring/` folder) are named after this project.
 
 Confirmed working end-to-end on real hardware, **both legacy BIOS and UEFI**
 (2026-10-21, TrueNAS 25.10.2.1, opbevaring 1.0.1): PXE boot → payload fetch
@@ -17,6 +21,7 @@ reboot into the installed system.
 
 ## Contents
 
+- [Why "Opbevaring"?](#why-opbevaring)
 - [Why this exists](#why-this-exists)
 - [How it works](#how-it-works)
 - [Why there are two initrds](#why-there-are-two-initrds)
@@ -31,6 +36,16 @@ reboot into the installed system.
 - [Status](#status)
 - [Planned](#planned)
 - [Release history](#release-history)
+
+## Why "Opbevaring"?
+
+"Opbevaring" is Danish for:
+
+> storage / safekeeping
+
+as in *bagageopbevaring*, a left-luggage office — somewhere things are put
+to be kept safe. Fitting for a project whose whole job is installing a
+storage system.
 
 ## Why this exists
 
@@ -291,7 +306,8 @@ The hook depends on three things in the TrueNAS image, all true for
 ## Status
 
 Confirmed on real hardware (2026-10-21, 25.10.2.1): full install via the
-stock TUI, under both legacy BIOS and UEFI.
+stock TUI, under both legacy BIOS and UEFI, and on the serial console via
+`:opbevaring-s` (on a Dell NAS).
 
 Also checked against the 25.10.2.1 ISO, before that:
 
@@ -308,8 +324,8 @@ Also checked against the 25.10.2.1 ISO, before that:
   file all rejected with the partial file removed; no `update_url=` is a
   clean no-op
 
-Not yet exercised on hardware: `update_sha256=`, the `-s` serial stanza,
-and any TrueNAS release other than 25.10.2.1.
+Not yet exercised on hardware: `update_sha256=` (tested offline only, see
+above), and any TrueNAS release other than 25.10.2.1.
 
 ## Planned
 
