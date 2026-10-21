@@ -1,0 +1,2 @@
+/scripts/live-bottom/opbevaring "$@"
+[ -e /conf/param.conf ] && . /conf/param.conf

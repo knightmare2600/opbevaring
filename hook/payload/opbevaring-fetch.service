@@ -1,0 +1,15 @@
+[Unit]
+Description=opbevaring: fetch the TrueNAS update payload into /cdrom
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/opbevaring-fetch
+StandardOutput=journal+console
+StandardError=journal+console
+TimeoutStartSec=30min
+
+[Install]
+WantedBy=multi-user.target

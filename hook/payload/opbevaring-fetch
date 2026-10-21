@@ -1,0 +1,82 @@
+#!/bin/sh
+# Fetches the TrueNAS update payload named by update_url= on the kernel cmdline into a tmpfs
+# mounted on /cdrom, at the exact path the stock installer mounts it from.
+#
+# Kernel cmdline:
+#   update_url=<url>        required -- where to fetch the .update payload from
+#   update_sha256=<hex>     optional -- verify the download before handing it over
+set -eu
+
+installer_py=/usr/lib/python3/dist-packages/truenas_installer/install.py
+
+cmdline_value()
+{
+  # /proc/cmdline is one line of space-separated parameters -- word splitting is the point.
+  # shellcheck disable=SC2013
+  for arg in $(cat /proc/cmdline)
+  do
+    case "${arg}" in
+      "$1"=*)
+        echo "${arg#*=}"
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+if ! url=$(cmdline_value update_url)
+then
+  echo "opbevaring: no update_url= on the kernel cmdline, nothing to do"
+  exit 0
+fi
+sha=$(cmdline_value update_sha256) || sha=""
+
+# The filename changes between releases (TrueNAS-SCALE.update in 25.10.2.1, TrueNAS.update on
+# truenas-installer's master branch), so read it from the installer that's actually about to
+# consume it rather than hardcoding either.
+target=$(grep -o '/cdrom/[^"]*\.update' "${installer_py}" | head -n 1)
+if [ -z "${target}" ]
+then
+  echo "opbevaring: could not find the /cdrom/*.update path in ${installer_py}" >&2
+  exit 1
+fi
+
+mkdir -p /cdrom
+if ! mountpoint -q /cdrom
+then
+  # size= is a ceiling, not a reservation -- tmpfs only consumes what's actually written.
+  mount -t tmpfs -o size=4G,mode=0755 opbevaring /cdrom
+fi
+
+echo "opbevaring: fetching ${url} -> ${target}"
+if ! curl --fail --location --retry 5 --retry-delay 5 --progress-bar --output "${target}.part" "${url}" 2>/dev/console
+then
+  echo "opbevaring: download of ${url} failed" >&2
+  rm -f "${target}.part"
+  exit 1
+fi
+
+if [ -n "${sha}" ]
+then
+  echo "opbevaring: verifying sha256"
+  if ! echo "${sha}  ${target}.part" | sha256sum -c -
+  then
+    echo "opbevaring: sha256 mismatch for ${url}" >&2
+    rm -f "${target}.part"
+    exit 1
+  fi
+fi
+
+# install.py loop-mounts this as squashfs; catch an HTML error page or a truncated file here,
+# with a clear message, rather than as an obscure mount failure halfway through an install.
+if [ "$(head -c 4 "${target}.part")" != "hsqs" ]
+then
+  echo "opbevaring: ${url} is not a squashfs image" >&2
+  rm -f "${target}.part"
+  exit 1
+fi
+
+mv "${target}.part" "${target}"
+chmod 0444 "${target}"
+echo "opbevaring: ${target} ready"

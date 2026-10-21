@@ -1,0 +1,22 @@
+# ===========================================================================
+# PROJEKT opbevaring -- TrueNAS SCALE over PXE
+# Stock TrueNAS kernel/initrd/live squashfs (extracted unmodified from the
+# official ISO by build/extract-iso.sh), plus opbevaring-hook.cpio appended as
+# a second initrd. The hook fetches update_url= into /cdrom before the stock
+# installer TUI (tty1/ttyS0) or its JSON-RPC server (port 8080) start.
+#
+# UNTESTED on real hardware as of 2026-10-21 -- see README.md "Status".
+# Paths follow ${boot-url}/<product>/<project>/<version>/, cf. :klargoring's
+# ${boot-url}/proxmox/klargoring/<arch>/.
+# ===========================================================================
+:opbevaring
+kernel ${boot-url}/truenas/opbevaring/25.10.2.1/vmlinuz boot=live fetch=${boot-url}/truenas/opbevaring/25.10.2.1/filesystem.squashfs update_url=${boot-url}/truenas/opbevaring/25.10.2.1/TrueNAS-SCALE.update nomodeset console=tty0
+initrd ${boot-url}/truenas/opbevaring/25.10.2.1/initrd.img
+initrd ${boot-url}/truenas/opbevaring/25.10.2.1/opbevaring-hook.cpio
+boot
+
+:opbevaring-s
+kernel ${boot-url}/truenas/opbevaring/25.10.2.1/vmlinuz boot=live fetch=${boot-url}/truenas/opbevaring/25.10.2.1/filesystem.squashfs update_url=${boot-url}/truenas/opbevaring/25.10.2.1/TrueNAS-SCALE.update nomodeset console=tty0 console=ttyS0,115200n8
+initrd ${boot-url}/truenas/opbevaring/25.10.2.1/initrd.img
+initrd ${boot-url}/truenas/opbevaring/25.10.2.1/opbevaring-hook.cpio
+boot

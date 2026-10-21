@@ -1,0 +1,68 @@
+#!/bin/sh
+# opbevaring live-bottom hook.
+#
+# Runs inside the stock TrueNAS initramfs, from live-boot's /scripts/live-bottom stage
+# (live-boot >= 1:20180328, Debian #884355). At that point live-boot has already mounted the
+# writable overlay root at ${rootmnt} (exported by initramfs-tools' /init), and switch_root
+# hasn't happened yet -- so anything copied into ${rootmnt} here is simply part of the booted
+# live system. The stock initrd ships no /scripts/live-bottom at all (checked against
+# 25.10.2.1), so this directory and its ORDER file are entirely ours; nothing is clobbered.
+#
+# Does nothing unless update_url= is on the kernel cmdline, so the same appended cpio is inert
+# if it ever ends up on a boot that isn't meant to be an opbevaring PXE boot.
+
+PREREQ=""
+
+prereqs()
+{
+  echo "${PREREQ}"
+}
+
+case "$1" in
+  prereqs)
+    prereqs
+    exit 0
+    ;;
+esac
+
+case " $(cat /proc/cmdline) " in
+  *" update_url="*)
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+
+# Exported by initramfs-tools' /init ("export rootmnt=/root"); refuse to run without it rather
+# than write into the initramfs' own /etc.
+: "${rootmnt:?rootmnt not set -- not running under initramfs-tools}"
+
+src=/opbevaring
+etc="${rootmnt}/etc/systemd/system"
+
+mkdir -p "${rootmnt}/usr/local/sbin"
+cp "${src}/opbevaring-fetch" "${rootmnt}/usr/local/sbin/opbevaring-fetch"
+chmod 0755 "${rootmnt}/usr/local/sbin/opbevaring-fetch"
+
+mkdir -p "${etc}/multi-user.target.wants"
+cp "${src}/opbevaring-fetch.service" "${etc}/opbevaring-fetch.service"
+ln -sf ../opbevaring-fetch.service "${etc}/multi-user.target.wants/opbevaring-fetch.service"
+
+# mount-cd.service probes (and mounts, read-write) every local disk partition looking for the
+# .update file. On a PXE boot there's no installation medium to find, and it has no business
+# poking at the target disks, so mask it outright.
+ln -sf /dev/null "${etc}/mount-cd.service"
+
+# Hold the console TUI (autologin root -> .bash_profile -> truenas_installer) and the JSON-RPC
+# installer server back until the payload is in place, so nobody can start an install that
+# fails on a missing /cdrom/*.update.
+for unit in getty@.service serial-getty@.service truenas-installer.service
+do
+  mkdir -p "${etc}/${unit}.d"
+  cp "${src}/after-fetch.conf" "${etc}/${unit}.d/opbevaring.conf"
+done
+
+mkdir -p "${etc}/systemd-networkd-wait-online.service.d"
+cp "${src}/wait-online-any.conf" "${etc}/systemd-networkd-wait-online.service.d/opbevaring.conf"
+
+exit 0
