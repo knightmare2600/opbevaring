@@ -2,7 +2,7 @@
 
 PXE/iPXE boot for the official TrueNAS SCALE installer, with no ISO in the
 loop and no rebuilt TrueNAS image: the stock kernel, initrd and live root
-straight off the ISO, plus one 7.5 KiB extra initrd that fetches the install
+straight off the ISO, plus one 8.5 KiB extra initrd that fetches the install
 payload from a URL given on the kernel cmdline.
 
 *Opbevaring* (Danish, "storage" — see [Why "Opbevaring"?](#why-opbevaring))
@@ -30,6 +30,7 @@ reboot into the installed system.
 - [Serving](#serving)
 - [Booting via iPXE](#booting-via-ipxe)
 - [Kernel cmdline](#kernel-cmdline)
+- [Payload verification](#payload-verification)
 - [RAM](#ram)
 - [Debugging a booted instance](#debugging-a-booted-instance)
 - [Moving to a new TrueNAS release](#moving-to-a-new-truenas-release)
@@ -107,8 +108,9 @@ releases.
      one cable plugged in isn't held up by its other links
 4. In the booted live system, `opbevaring-fetch` mounts a tmpfs on `/cdrom`,
    downloads `update_url=` into it (curl progress bar on the console),
-   optionally checks `update_sha256=`, checks it's a squashfs, and puts it
-   at the path `install.py` mounts. That path is read from `install.py`
+   verifies its sha256 (on by default, see
+   [Payload verification](#payload-verification)), checks it's a squashfs,
+   and puts it at the path `install.py` mounts. That path is read from `install.py`
    itself at runtime, not hardcoded, since the name differs between
    releases (`TrueNAS-SCALE.update` in 25.10.2.1, `TrueNAS.update` on
    truenas-installer's master branch).
@@ -121,7 +123,7 @@ releases.
 
 ```
 initrd ${boot-url}/opbevaring/25.10.2.1/initrd.img            <- TrueNAS's, byte-for-byte off the ISO
-initrd ${boot-url}/opbevaring/25.10.2.1/opbevaring-hook.cpio  <- ours, 7.5 KiB
+initrd ${boot-url}/opbevaring/25.10.2.1/opbevaring-hook.cpio  <- ours, 8.5 KiB
 ```
 
 The Linux kernel's initramfs format is defined as "a collection of
@@ -139,7 +141,7 @@ cpio in front of the main initrd
 
 So the second `initrd` line isn't a second boot stage, a chain-load or a
 replacement — the kernel ends up with one initramfs, which is TrueNAS's own
-plus four extra small files of ours. Keeping them as two separate files
+plus six small files of ours. Keeping them as two separate files
 rather than merging ours into TrueNAS's is deliberate:
 
 - **TrueNAS's files stay byte-identical to the ISO.** Every one of the four
@@ -160,7 +162,7 @@ rather than merging ours into TrueNAS's is deliberate:
   replacing it would break the boot.
 - **Uncompressed on purpose.** The TrueNAS kernel supports every initramfs
   compression (`CONFIG_RD_GZIP/XZ/ZSTD/...=y`), but gzip would save about
-  4.5 KiB on a boot that downloads 2 GiB, and uncompressed can be inspected
+  5 KiB on a boot that downloads 2 GiB, and uncompressed can be inspected
   directly with `cpio -itv < opbevaring-hook.cpio`.
 
 `cat initrd.img opbevaring-hook.cpio > combined.img` and a single `initrd`
@@ -236,6 +238,11 @@ i.e. `${boot-url}/opbevaring/<version>/`. Any plain HTTP server works —
 `live-boot`'s `fetch=` uses `wget`, the payload fetch uses `curl`, nothing
 needs directory listings or range requests.
 
+**`SHA256SUMS` must be served alongside the `.update`** — it's what the
+payload is verified against by default (see
+[Payload verification](#payload-verification)). Without it, the fetch
+refuses to proceed unless verification is explicitly turned off.
+
 ## Booting via iPXE
 
 From `examples/menu.ipxe`:
@@ -259,11 +266,41 @@ boot
 - `update_url=<url>` — **required**. Where to fetch the `.update` payload.
   Without it the hook does nothing at all, so the extra initrd is inert on
   any other boot.
-- `update_sha256=<hex>` — optional. Verified before the file is handed over;
-  the value for each release is in the `SHA256SUMS` that `extract-iso.sh`
-  writes.
+- `update_sha256=<hex>` — optional. Pin the expected sha256 explicitly,
+  instead of looking it up in `SHA256SUMS`.
+- `update_sha256=off` — optional. Turn payload verification off.
 - `nomodeset`, `console=tty0` / `console=ttyS0,115200n8` — as in the ISO's
   own GRUB menu.
+
+## Payload verification
+
+On by default. Before downloading the `.update`, `opbevaring-fetch` works
+out the sha256 it expects:
+
+| Kernel cmdline | Expected hash comes from | If it can't be found |
+|---|---|---|
+| *(nothing)* | `SHA256SUMS` in the same folder as `update_url=`, looked up by the `.update`'s filename | fetch fails, nothing is downloaded |
+| `update_sha256=<hex>` | that value; `SHA256SUMS` isn't consulted | — |
+| `update_sha256=off` | nowhere — not verified, and says so on the console | — |
+
+The hash is resolved *before* the ~2 GiB download, so a missing
+`SHA256SUMS` (HTTP 404) or one without an entry for the file fails in
+seconds, not after the transfer. After the download, a mismatch deletes the
+partial file and the fetch fails; nothing is placed in `/cdrom`, so the
+installer can't start an install from it. Either way the console still
+comes up, and `journalctl -u opbevaring-fetch` says exactly why.
+
+The default needs no per-release hash in `menu.ipxe`: `extract-iso.sh`
+writes `SHA256SUMS` into every version folder, computed from the ISO's own
+files, and that's the single source of truth. It catches truncated or
+corrupted downloads and the wrong file at the URL (e.g. a stale `.update`
+from another release). It isn't tamper-proofing: everything is plain HTTP,
+and anyone who can change the served `SHA256SUMS` or `menu.ipxe` can change
+the hash too.
+
+Both `curl` calls retry 5 times, 5 s apart, including on connection
+refused (`--retry-connrefused`, curl 7.88.1 in the 25.10.2.1 live root).
+An HTTP 404 isn't retried.
 
 ## RAM
 
@@ -323,9 +360,16 @@ Also checked against the 25.10.2.1 ISO, before that:
   well-formed wrong sha256, malformed sha256, HTTP 404 and a non-squashfs
   file all rejected with the partial file removed; no `update_url=` is a
   clean no-op
+- default-on verification (2026-10-21, offline, same harness): hash from
+  `SHA256SUMS` OK; `SHA256SUMS` 404 and `SHA256SUMS` without an entry both
+  fail in 0 s with nothing downloaded; wrong hash in `SHA256SUMS` rejected;
+  explicit `update_sha256=<hex>` works without `SHA256SUMS` and overrides a
+  good one; `update_sha256=off` installs unverified; a server that starts
+  3 s late is retried through
 
-Not yet exercised on hardware: `update_sha256=` (tested offline only, see
-above), and any TrueNAS release other than 25.10.2.1.
+Not yet exercised on hardware: default-on verification (the hardware tests
+above were on 1.0.1, which only verified when `update_sha256=` was given),
+and any TrueNAS release other than 25.10.2.1.
 
 ## Planned
 
@@ -337,6 +381,9 @@ above), and any TrueNAS release other than 25.10.2.1.
 
 ## Release history
 
+- **Unreleased** — payload sha256 verification on by default, looked up
+  in the version folder's `SHA256SUMS`; `update_sha256=off` to disable.
+  `--retry-connrefused` on both `curl` calls.
 - **1.0.1** (2026-10-21) — first release. Web layout
   `bootstrap/web/opbevaring/<version>/`. Confirmed end-to-end on BIOS and
   UEFI with TrueNAS 25.10.2.1. `opbevaring-hook.cpio` is byte-identical to

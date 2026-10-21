@@ -10,6 +10,12 @@
 # installer -> truenas_admin password prompt -> install -> reboot.
 # :opbevaring-s confirmed on the serial console the same day (Dell NAS).
 #
+# Payload sha256 verification is ON by default: the hook looks the .update up
+# in the SHA256SUMS served in the same version folder (written by
+# extract-iso.sh), so no hash needs copying into this menu. To pin a hash
+# explicitly, add update_sha256=<hex>; to turn verification off, add
+# update_sha256=off. See README.md "Payload verification".
+#
 # Web layout is bootstrap/web/opbevaring/<version>/, i.e.
 # ${boot-url}/opbevaring/<version>/ -- fully literal per-version paths, same
 # reasoning as :klargoring's literal per-arch paths.
